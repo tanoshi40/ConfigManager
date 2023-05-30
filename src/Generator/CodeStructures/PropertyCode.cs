@@ -1,7 +1,7 @@
-namespace ConfigManager.Generator;
+namespace ConfigManager.Generator.CodeStructures;
 
-internal record struct PropertyCode(string CamelCaseName, string PascalCaseName, string FullyQualifiedType)
+internal record struct PropertyCode(string Name, string LoweredName, string FullyQualifiedType)
 {
     internal string GetPropertyDeclaration(string accessModifier = "public", string accessors = "get; set;") =>
-        $"{accessModifier} {FullyQualifiedType} {PascalCaseName} {accessors}";
+        $"{accessModifier} {FullyQualifiedType} {Name} {accessors}";
 }
