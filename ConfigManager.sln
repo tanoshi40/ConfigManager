@@ -6,7 +6,6 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "test", "test", "{DE0EC81D-0
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "scripts", "scripts", "{76F50BA9-3745-4464-8327-3B757ED9B7BA}"
 	ProjectSection(SolutionItems) = preProject
-		scripts\build.bat = scripts\build.bat
 		scripts\build.ps1 = scripts\build.ps1
 		scripts\build.sh = scripts\build.sh
 	EndProjectSection
