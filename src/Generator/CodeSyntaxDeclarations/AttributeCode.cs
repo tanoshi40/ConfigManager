@@ -1,19 +1,19 @@
 using System;
 using System.Linq;
 
-namespace ConfigManager.Generator.CodeStructures;
+namespace ConfigManager.Generator.CodeSyntaxDeclarations;
 
 internal class DefinedAttributeCode : AttributeCode
 {
     public string Namespace { get; set; }
     public string GenAttribute { get; set; }
-    public PropertyCode[] Properties { get; set; }
+    public CodeSyntaxDefinitions.Property[] Properties { get; set; }
     public AttributeTargets[] Targets { get; set; }
     public string AttributeAccessModifier { get; set; }
     public string ConstructorAccessModifier { get; set; }
     public bool AllowMultiple { get; set; }
 
-    public DefinedAttributeCode(string name, string @namespace, string genAttribute, PropertyCode[] properties,
+    public DefinedAttributeCode(string name, string @namespace, string genAttribute, CodeSyntaxDefinitions.Property[] properties,
         AttributeTargets[] targets, string attributeAccessModifier = "internal",
         string constructorAccessModifier = "internal", bool allowMultiple = false) : base(name)
     {
@@ -30,19 +30,25 @@ internal class DefinedAttributeCode : AttributeCode
     {
         get
         {
-            string targets = string.Join(" | ",
-                Targets.Select(target => $"global::System.AttributeTargets.{target.ToString()}"));
+            string targets =
+                Targets.Length == 0
+                    ? AttributeTargets.All.GetFullQualifiedName()
+                    : string.Join(" | ",
+                        Targets.Select(target => target.GetFullQualifiedName()));
             string usages =
-                $"[global::System.AttributeUsage({targets}, AllowMultiple = {AllowMultiple}, Inherited = false)]";
+                $"[global::System.AttributeUsage({targets}, AllowMultiple = {AllowMultiple.ToLowerString()}, Inherited = false)]";
 
-            string constructor =
-                $$"""
-            public {{FullName}}({{string.Join(", ", Properties.Select(prop => $"{prop.FullyQualifiedType} {prop.LoweredName}"))}}) {
-                {{string.Join(GeneratorHelper.NewLine, Properties.Select(prop => $"this.{prop.Name} = {prop.LoweredName}"))}}
-            }
-            """;
-            string properties = string.Join(GeneratorHelper.NewLine,
-                Properties.Select(prop => prop.GetPropertyDeclaration(accessors: "get;")));
+//             string content = Properties.Length == 0
+//                 ? "{}"
+//                 : $$"""
+//                 {
+//                         {{string.Join(GeneratorHelper.NewLine,
+//                             Properties.Select(prop => prop.GetCode(null)))}}
+//                         public {{FullName}}({{string.Join(", ", Properties.Select(prop => $"{prop.FullyQualifiedType} {prop.AlternativeName}"))}}) {
+//                             {{string.Join(GeneratorHelper.NewLine, Properties.Select(prop => $"this.{prop.Name} = {prop.AlternativeName};"))}}
+//                         }
+//                     }
+//                 """;
 
             string code =
                 $$"""
@@ -53,10 +59,7 @@ internal class DefinedAttributeCode : AttributeCode
                 {{GenAttribute}}
                 {{usages}}
                 {{AttributeAccessModifier}} sealed class {{FullName}} : global::System.Attribute
-                {
-                    {{properties}}
-                    {{constructor}}
-                }
+                {{"content"}}
             }
             """;
 
