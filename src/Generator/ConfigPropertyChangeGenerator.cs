@@ -19,7 +19,7 @@ public class ConfigPropertyChangeGenerator : IIncrementalGenerator
     {
         Version = typeof(ConfigPropertyChangeGenerator).GetAssemblyVersion();
 
-        CodeGenAttribute = SyntaxBuilder.BuildGeneratorAttribute(GenName, Version);
+        CodeGenAttribute = GeneratorHelper.BuildGeneratorAttribute(GenName, Version);
         GenAttributeStr = $"[{CodeGenAttribute.ToString()}]";
 
         ConstantAttributes = new CodeSyntaxDefinitions.Attribute[]
