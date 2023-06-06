@@ -13,45 +13,44 @@ internal static class CodeSyntaxDefinitions
 
     internal class Property : Field
     {
-        public bool HasGetter { get; }
-        public bool HasSetter { get; }
+        internal bool HasGetter { get; }
+        internal bool HasSetter { get; }
 
-        public string? BackingFieldName { get; private set; } // TODO: make private when possible!
+        internal string? BackingFieldName { get; }
 
-
-        public Property WithBackingFieldName(string name)
+        public Property(string name,
+            string fullyQualifiedType,
+            string? alternativeName = null,
+            string? backingFieldName = null,
+            Modifier[]? otherModifiers = null,
+            SyntaxList<AttributeListSyntax>? attributes = null,
+            Modifier accessModifier = Modifier.Public,
+            bool hasGetter = true,
+            bool hasSetter = false) :
+            base(
+                name,
+                fullyQualifiedType,
+                accessModifier,
+                alternativeName,
+                otherModifiers,
+                attributes)
         {
-            BackingFieldName = name;
-            return this;
-        }
-
-        public new Property WithAlternativeName(string name) => (Property)base.WithAlternativeName(name);
-
-        public bool HasBackingFieldName => BackingFieldName is not null;
-
-        public Property(string name, string fullyQualifiedType,
-            Modifier accessModifier = Modifier.Public, bool hasGetter = true,
-            bool hasSetter = false) : base(name, fullyQualifiedType, accessModifier)
-        {
+            BackingFieldName = backingFieldName;
             HasGetter = hasGetter;
             HasSetter = hasSetter;
         }
 
-
-        public override string GetCode(AttributeSyntax codeGenAttribute) =>
-            AsMember(codeGenAttribute).NormalizeWhitespace().ToString();
-
-        public override MemberDeclarationSyntax AsMember(AttributeSyntax codeGenAttribute)
+        protected override MemberDeclarationSyntax MemberSyntax(AttributeSyntax codeGenAttribute)
         {
             SyntaxList<AccessorDeclarationSyntax> accessors = new();
             if (HasGetter)
             {
-                accessors=accessors.Add(SyntaxBuilder.PropConstants.Getter);
+                accessors = accessors.Add(SyntaxBuilder.PropConstants.Getter);
             }
 
             if (HasSetter)
             {
-                accessors=accessors.Add(SyntaxBuilder.PropConstants.Setter);
+                accessors = accessors.Add(SyntaxBuilder.PropConstants.Setter);
             }
 
             return PropertyDeclaration(
@@ -63,47 +62,24 @@ internal static class CodeSyntaxDefinitions
         }
     }
 
-    internal class Field
+    internal class Field : MemberType
     {
-        private string? _alternativeName;
-        public string Name { get; }
-        public string FullyQualifiedType { get; }
+        internal string AlternativeName { get; }
 
-        private string AlternativeName
-        {
-            get => _alternativeName ?? Name.ToLower();
-            set => _alternativeName = value;
-        }
+        public Field(string name, string fullyQualifiedType, Modifier accessModifier, string? alternativeName,
+            Modifier[]? otherModifiers, SyntaxList<AttributeListSyntax>? attributes) :
+            base(name, fullyQualifiedType,
+                accessModifier, otherModifiers, attributes) =>
+            AlternativeName = alternativeName ?? Name.ToLower();
 
-        public Modifier AccessModifier { get; }
-        public bool HasAlternativeName => _alternativeName is not null;
+        public Parameter AsParameter() => Parameter.CreateInstance(this);
 
-        public Field(string name, string fullyQualifiedType, Modifier accessModifier)
-        {
-            Name = name;
-            FullyQualifiedType = fullyQualifiedType;
-            AccessModifier = accessModifier;
-        }
-
-        public virtual string GetCode(AttributeSyntax codeGenAttribute) =>
-            AsMember(codeGenAttribute).NormalizeWhitespace().ToString();
-
-
-        public virtual MemberDeclarationSyntax AsMember(AttributeSyntax codeGenAttribute) =>
+        protected override MemberDeclarationSyntax MemberSyntax(AttributeSyntax codeGenAttribute) =>
             FieldDeclaration(
                     VariableDeclaration(IdentifierName(FullyQualifiedType))
                         .WithVariables(SingletonSeparatedList(VariableDeclarator(Identifier(Name)))))
                 .WithModifiers(TokenList(AccessModifier.SyntaxToken()))
                 .WithAttributeLists(SingletonList(codeGenAttribute.Singelton()));
-
-        public virtual ParameterSyntax AsParameter() =>
-            Parameter(Identifier(AlternativeName)).WithType(IdentifierName(FullyQualifiedType));
-
-        public Field WithAlternativeName(string name)
-        {
-            AlternativeName = name;
-            return this;
-        }
 
         public ExpressionStatementSyntax SetExpression() =>
             ExpressionStatement(AssignmentExpression(
@@ -116,97 +92,186 @@ internal static class CodeSyntaxDefinitions
             ));
     }
 
-    internal class Constructor
+    internal class Constructor : Method
     {
-        public string Name { get; }
-        public Field[] Fields { get; }
-        public Modifier AccessModifier { get; }
-
-        public Constructor(string name, Field[] fields, Modifier accessModifier)
+        internal Constructor(string name, Modifier accessModifier, BlockSyntax? body = null,
+            SyntaxList<AttributeListSyntax>? attributes = null) :
+            base(name, name, accessModifier, null, null, attributes, body)
         {
-            Name = name;
-            Fields = fields;
-            AccessModifier = accessModifier;
         }
 
-        public virtual string GetCode(AttributeSyntax codeGenAttribute) =>
-            GetSyntax(codeGenAttribute).NormalizeWhitespace().ToString();
+        protected override MemberDeclarationSyntax MemberSyntax(AttributeSyntax codeGenAttribute) =>
+            ConstructorDeclaration(Identifier(Name))
+                .WithParameterList(AsParameterList())
+                .WithBody(Body);
+    }
 
+    internal class Method : MemberType
+    {
+        internal Parameter[] Parameters { get; }
+        internal BlockSyntax Body { get; }
 
-        public virtual MemberDeclarationSyntax GetSyntax(AttributeSyntax codeGenAttribute)
+        public Method(string name, string fullyQualifiedReturnType, Modifier accessModifier, Modifier[]? otherModifiers,
+            Parameter[]? parameters, SyntaxList<AttributeListSyntax>? attributes, BlockSyntax? body) : base(name,
+            fullyQualifiedReturnType, accessModifier, otherModifiers, attributes)
         {
-            ConstructorDeclarationSyntax builder = ConstructorDeclaration(Identifier(Name))
-                .WithAttributeLists(SingletonList(codeGenAttribute.Singelton()))
-                .WithModifiers(TokenList(AccessModifier.SyntaxToken()));
+            Parameters = parameters ?? Array.Empty<Parameter>();
+            Body = body ?? Block();
+        }
 
-            SyntaxNodeOrToken[] parameterFields = new SyntaxNodeOrToken[Fields.Length];
-            StatementSyntax[] setExpressions = new StatementSyntax[Fields.Length];
+        protected ParameterListSyntax AsParameterList()
+        {
+            SyntaxNodeOrToken[] parameters = new SyntaxNodeOrToken[Parameters.Length];
 
-            if (Fields.Length == 0)
+            for (int i = 0; i < Parameters.Length; i++)
             {
-                return builder.WithBody(Block());
+                parameters[i] = Parameters[i].AsSyntax();
             }
 
-            for (int i = 0; i < Fields.Length; i++)
-            {
-                Field field = Fields[i];
+            return ParameterList(SeparatedList<ParameterSyntax>(parameters.JoinArray(CommaToken)));
+        }
 
-                parameterFields[i] = field.AsParameter();
-                setExpressions[i] = field.SetExpression();
+        protected override MemberDeclarationSyntax MemberSyntax(AttributeSyntax codeGenAttribute) =>
+            MethodDeclaration(IdentifierName(FullyQualifiedType), Identifier(Name))
+                .WithParameterList(AsParameterList())
+                .WithBody(Body);
+    }
+
+    internal class Parameter
+    {
+        internal string FullyQualifiedType { get; }
+        internal string Name { get; }
+
+        private Parameter(string fullyQualifiedType, string name)
+        {
+            FullyQualifiedType = fullyQualifiedType;
+            Name = name;
+        }
+
+        public static Parameter CreateInstance(Field field) => new(field.FullyQualifiedType, field.AlternativeName);
+
+        public ParameterSyntax AsSyntax() =>
+            Parameter(Identifier(Name))
+                .WithType(IdentifierName(FullyQualifiedType));
+    }
+
+    internal class Attribute : Clazz
+    {
+        private const string FullGlobalPrefix = "global::System";
+
+        private const string FullAttribute = $"{FullGlobalPrefix}.{nameof(Attribute)}";
+        private const string FullAttributeUsage = $"{FullGlobalPrefix}.{nameof(AttributeUsageAttribute)}";
+        private const string FullAttributeTargets = $"{FullGlobalPrefix}.{nameof(AttributeTargets)}";
+
+        internal Attribute(string name,
+            AttributeTargets targets,
+            bool allowMultiple = false,
+            Modifier accessModifier = Modifier.Public, Field[]? members = null, Method[]? methods = null,
+            SyntaxList<AttributeListSyntax>? attributes = null) :
+            base(
+                $"{name}Attribute",
+                accessModifier, null,
+                members,
+                methods,
+                new[] {new BaseType(FullAttribute)},
+                (attributes ?? new()).Add(AttributeUsageSyntax(allowMultiple, targets).Singelton()))
+        {
+        }
+
+        private static AttributeArgumentSyntax BuildTargetsSyntax(AttributeTargets flaggedTargets)
+        {
+            if (flaggedTargets == AttributeTargets.All || flaggedTargets.HasFlag(AttributeTargets.All))
+            {
+                return AttributeArgument(
+                    MemberAccessExpression(
+                        SyntaxKind.SimpleMemberAccessExpression,
+                        IdentifierName(FullAttributeTargets), IdentifierName(flaggedTargets.ToString()))
+                );
             }
 
-            return builder.WithParameterList(
-                    ParameterList(SeparatedList<ParameterSyntax>(parameterFields.JoinArray(CommaToken))))
-                .WithBody(Block(setExpressions));
+            AttributeTargets[] targets = flaggedTargets.SplitFlagEnum();
+            string[] mapped = new string[targets.Length];
+
+            for (int i = 0; i < targets.Length; i++)
+            {
+                AttributeTargets attributeTargets = targets[i];
+                mapped[i] = $"{FullAttributeTargets}.{attributeTargets.ToString()}";
+            }
+
+            string targetStr = string.Join(" | ", mapped);
+            return AttributeArgument(IdentifierName(targetStr));
+        }
+
+        private static AttributeSyntax AttributeUsageSyntax(bool allowMultiple, AttributeTargets target)
+        {
+            SyntaxNodeOrToken[] arguments =
+            {
+                BuildTargetsSyntax(target), Token(SyntaxKind.CommaToken), AttributeArgument(
+                        LiteralExpression(allowMultiple
+                            ? SyntaxKind.TrueLiteralExpression
+                            : SyntaxKind.FalseLiteralExpression))
+                    .WithNameEquals(
+                        NameEquals(
+                            IdentifierName("AllowMultiple"))),
+                Token(SyntaxKind.CommaToken), AttributeArgument(
+                        LiteralExpression(
+                            SyntaxKind.FalseLiteralExpression))
+                    .WithNameEquals(
+                        NameEquals(
+                            IdentifierName("Inherited")))
+            };
+            return Attribute(
+                    IdentifierName(FullAttributeUsage))
+                .WithArgumentList(
+                    AttributeArgumentList(
+                        SeparatedList<AttributeArgumentSyntax>(
+                            arguments)));
         }
     }
 
-    internal class Clazz
+    internal class Clazz : MemberType
     {
-        private Clazz(string name, Modifier accessModifier, Field[] members,
-            Modifier[] otherModifiers, SyntaxList<AttributeListSyntax> attributes, BaseType[] baseTypes)
+        public Clazz(string name, Modifier accessModifier,
+            Modifier[]? otherModifiers, Field[]? members,
+            Method[]? methods, BaseType[]? baseTypes,
+            SyntaxList<AttributeListSyntax>? attributes) : base(name, name, accessModifier, otherModifiers, attributes)
         {
-            Name = name;
-            Members = members;
-            Attributes = attributes;
-            BaseTypes = baseTypes;
-            AccessModifier = accessModifier;
-            OtherModifiers = otherModifiers;
+            Members = members ?? Array.Empty<Field>();
+            BaseTypes = baseTypes ?? Array.Empty<BaseType>();
+            Methods = methods ?? Array.Empty<Method>();
         }
 
-        public static Clazz CreateInstance(string name, Modifier accessModifier, Field[]? members = null,
-            Modifier[]? otherModifiers = null, SyntaxList<AttributeListSyntax>? attributes = null,
-            BaseType[]? baseTypes = null) =>
-            new(name, accessModifier, members ?? Array.Empty<Field>(),
-                otherModifiers ?? Array.Empty<Modifier>(), attributes ?? new(), baseTypes ?? Array.Empty<BaseType>());
+        internal Field[] Members { get; }
+        internal BaseType[] BaseTypes { get; }
+        internal Method[] Methods { get; }
 
-        public string Name { get; }
-        public Modifier AccessModifier { get; }
-        public Modifier[] OtherModifiers { get; }
-        public Field[] Members { get; set; }
-        public BaseType[] BaseTypes { get; }
-        public SyntaxList<AttributeListSyntax> Attributes { get; }
-
-        public string GetCode(AttributeSyntax codeGenAttribute) =>
-            GetSyntax(codeGenAttribute).NormalizeWhitespace().ToString();
-
-        private ClassDeclarationSyntax GetSyntax(AttributeSyntax codeGenAttribute)
+        protected Constructor GetInitConstructor()
         {
-            // Modifiers
-            SyntaxToken[] modifiers = new SyntaxToken[OtherModifiers.Length + 1];
+            BlockSyntax? body = null;
 
-            modifiers[0] = AccessModifier.SyntaxToken();
-            if (OtherModifiers.Length > 0)
+            if (Members.Length <= 0)
             {
-                for (int i = 0; i < OtherModifiers.Length; i++) { modifiers[i + 1] = OtherModifiers[i].SyntaxToken(); }
+                return new(Name, Modifier.Public, body);
             }
 
-            // ClassBuilder
-            ClassDeclarationSyntax builder = ClassDeclaration(Name);
-            builder = builder.WithAttributeLists(Attributes.Add(codeGenAttribute.Singelton()));
+            StatementSyntax[] expressions = new StatementSyntax[Members.Length];
+            for (int i = 0; i < Members.Length; i++)
+            {
+                Field field = Members[i];
+                expressions[i] = field.SetExpression();
+            }
 
-            SyntaxTokenList syntaxTokenList = TokenList(modifiers);
-            builder = builder.WithModifiers(syntaxTokenList);
+            body = Block(expressions);
+
+            return new(Name, Modifier.Public, body);
+        }
+
+        protected override MemberDeclarationSyntax MemberSyntax(AttributeSyntax codeGenAttribute)
+        {
+            // ClassBuilder
+            ClassDeclarationSyntax builder = ClassDeclaration(Name)
+                // Modifiers (private/public static abstract etc)
+                .WithModifiers(AsModifierList());
 
             // BaseClasses
             if (BaseTypes.Length > 0)
@@ -224,16 +289,77 @@ internal static class CodeSyntaxDefinitions
                         )));
             }
 
-            MemberDeclarationSyntax[] members = new MemberDeclarationSyntax[Members.Length + 1];
+            MemberDeclarationSyntax[] classContent = new MemberDeclarationSyntax[Members.Length + Methods.Length + 1];
 
             for (int i = 0; i < Members.Length; i++)
             {
-                members[i] = Members[i].AsMember(codeGenAttribute);
+                classContent[i] = Members[i].AsMember(codeGenAttribute);
             }
 
-            members[members.Length - 1] = new Constructor(Name, Members, Modifier.Public).GetSyntax(codeGenAttribute);
+            classContent[Members.Length == 0 ? 0 : Members.Length - 1] =
+                GetInitConstructor().AsMember(codeGenAttribute);
 
-            return builder.WithMembers(List(members));
+            for (int classIndex = Members.Length, methodIndex = 0;
+                 methodIndex < Methods.Length;
+                 methodIndex++, classIndex++)
+            {
+                classContent[classIndex] = Methods[methodIndex].AsMember(codeGenAttribute);
+            }
+
+            return builder.WithMembers(List(classContent));
+        }
+    }
+
+    internal abstract class MemberType : MultiModifierType
+    {
+        public string FileName => $"Generated_{Name}.cs";
+
+        internal string Name { get; }
+        internal string FullyQualifiedType { get; }
+        private SyntaxList<AttributeListSyntax> Attributes { get; }
+
+
+        protected MemberType(string name, string fullyQualifiedType, Modifier accessModifier,
+            Modifier[]? otherModifiers,
+            SyntaxList<AttributeListSyntax>? attributes) :
+            base(accessModifier, otherModifiers)
+        {
+            Name = name;
+            FullyQualifiedType = fullyQualifiedType;
+            Attributes = attributes ?? new();
+        }
+
+        public MemberDeclarationSyntax AsMember(AttributeSyntax codeGenAttribute) => MemberSyntax(codeGenAttribute)
+            .WithModifiers(AsModifierList())
+            .WithAttributeLists(Attributes.Add(codeGenAttribute.Singelton()));
+
+        protected abstract MemberDeclarationSyntax MemberSyntax(AttributeSyntax codeGenAttribute);
+    }
+
+    internal abstract class MultiModifierType
+    {
+        internal Modifier AccessModifier { get; }
+        internal Modifier[] OtherModifiers { get; }
+
+        protected MultiModifierType(Modifier accessModifier, Modifier[]? otherModifiers)
+        {
+            AccessModifier = accessModifier;
+            OtherModifiers = otherModifiers ?? Array.Empty<Modifier>();
+        }
+
+        protected SyntaxTokenList AsModifierList()
+        {
+            if (OtherModifiers.Length <= 0)
+            {
+                TokenList(AccessModifier.SyntaxToken());
+            }
+
+            // Modifiers
+            SyntaxToken[] modifiers = new SyntaxToken[OtherModifiers.Length + 1];
+            modifiers[0] = AccessModifier.SyntaxToken();
+            for (int i = 0; i < OtherModifiers.Length; i++) { modifiers[i + 1] = OtherModifiers[i].SyntaxToken(); }
+
+            return TokenList(modifiers);
         }
     }
 
@@ -244,216 +370,3 @@ internal static class CodeSyntaxDefinitions
                 IdentifierName(FullyQualifiedTypeName));
     }
 }
-
-class tmp
-{
-    tmp()
-    {
-        var x = ClassDeclaration("ATTRIBUTENAME")
-            .WithMembers(
-                List(
-                    new MemberDeclarationSyntax[]
-                    {
-                        // PROPERTIES
-
-                        PropertyDeclaration(
-                                IdentifierName("PROPTYPE1"),
-                                Identifier("PROPNAME1"))
-                            .WithModifiers(
-                                TokenList(
-                                    Token(SyntaxKind.PublicKeyword)))
-                            .WithAccessorList(
-                                AccessorList(
-                                    SingletonList<AccessorDeclarationSyntax>(
-                                        AccessorDeclaration(
-                                                SyntaxKind.GetAccessorDeclaration)
-                                            .WithSemicolonToken(
-                                                Token(SyntaxKind.SemicolonToken))))),
-                        PropertyDeclaration(
-                                IdentifierName("PROPTYPE2"),
-                                Identifier("PROPNAME2"))
-                            .WithModifiers(
-                                TokenList(
-                                    Token(SyntaxKind.PublicKeyword)))
-                            .WithAccessorList(
-                                AccessorList(
-                                    SingletonList<AccessorDeclarationSyntax>(
-                                        AccessorDeclaration(
-                                                SyntaxKind.GetAccessorDeclaration)
-                                            .WithSemicolonToken(
-                                                Token(SyntaxKind.SemicolonToken))))),
-                        PropertyDeclaration(
-                                IdentifierName("PROPTYPE3"),
-                                Identifier("PROPNAME3"))
-                            .WithModifiers(
-                                TokenList(
-                                    Token(SyntaxKind.PublicKeyword)))
-                            .WithAccessorList(
-                                AccessorList(
-                                    SingletonList<AccessorDeclarationSyntax>(
-                                        AccessorDeclaration(
-                                                SyntaxKind.GetAccessorDeclaration)
-                                            .WithSemicolonToken(
-                                                Token(SyntaxKind.SemicolonToken))))),
-
-
-                        // FIELDS
-
-
-                        FieldDeclaration(
-                                VariableDeclaration(
-                                        IdentifierName("FIELDTYPE1"))
-                                    .WithVariables(
-                                        SingletonSeparatedList<VariableDeclaratorSyntax>(
-                                            VariableDeclarator(
-                                                Identifier("FIELDNAME1")))))
-                            .WithModifiers(
-                                TokenList(
-                                    Token(SyntaxKind.PublicKeyword))),
-                        FieldDeclaration(
-                                VariableDeclaration(
-                                        IdentifierName("FIELDTYPE2"))
-                                    .WithVariables(
-                                        SingletonSeparatedList<VariableDeclaratorSyntax>(
-                                            VariableDeclarator(
-                                                Identifier("FIELDNAME2")))))
-                            .WithModifiers(
-                                TokenList(
-                                    Token(SyntaxKind.PublicKeyword))),
-                        FieldDeclaration(
-                                VariableDeclaration(
-                                        IdentifierName("FIELDTYPE3"))
-                                    .WithVariables(
-                                        SingletonSeparatedList<VariableDeclaratorSyntax>(
-                                            VariableDeclarator(
-                                                Identifier("FIELDNAME3")))))
-                            .WithModifiers(
-                                TokenList(
-                                    Token(SyntaxKind.PublicKeyword))),
-
-
-                        // CONSTRUCTOR
-
-
-                        ConstructorDeclaration(
-                                Identifier("ATTRIBUTENAME"))
-                            .WithModifiers(
-                                TokenList(
-                                    Token(SyntaxKind.PublicKeyword)))
-                            .WithParameterList(
-                                ParameterList(
-                                    SeparatedList<ParameterSyntax>(
-                                        new SyntaxNodeOrToken[]
-                                        {
-                                            Parameter(
-                                                    Identifier("propalt1"))
-                                                .WithType(
-                                                    IdentifierName("PROPTYPE1")),
-                                            Token(SyntaxKind.CommaToken), Parameter(
-                                                    Identifier("propalt2"))
-                                                .WithType(
-                                                    IdentifierName("PROPTYPE2")),
-                                            Token(SyntaxKind.CommaToken), Parameter(
-                                                    Identifier("propalt3"))
-                                                .WithType(
-                                                    IdentifierName("PROPTYPE3")),
-                                            Token(SyntaxKind.CommaToken), Parameter(
-                                                    Identifier("fieldalt1"))
-                                                .WithType(
-                                                    IdentifierName("FIELDTYPE1")),
-                                            Token(SyntaxKind.CommaToken), Parameter(
-                                                    Identifier("fieldalt2"))
-                                                .WithType(
-                                                    IdentifierName("FIELDTYPE2")),
-                                            Token(SyntaxKind.CommaToken), Parameter(
-                                                    Identifier("fieldalt3"))
-                                                .WithType(
-                                                    IdentifierName("FIELDTYPE3"))
-                                        })))
-                            .WithBody(
-                                Block(
-                                    ExpressionStatement(
-                                        AssignmentExpression(
-                                            SyntaxKind.SimpleAssignmentExpression,
-                                            MemberAccessExpression(
-                                                SyntaxKind.SimpleMemberAccessExpression,
-                                                ThisExpression(),
-                                                IdentifierName("PROPNAME1")),
-                                            IdentifierName("propalt1"))),
-                                    ExpressionStatement(
-                                        AssignmentExpression(
-                                            SyntaxKind.SimpleAssignmentExpression,
-                                            MemberAccessExpression(
-                                                SyntaxKind.SimpleMemberAccessExpression,
-                                                ThisExpression(),
-                                                IdentifierName("PROPNAME2")),
-                                            IdentifierName("propalt2"))),
-                                    ExpressionStatement(
-                                        AssignmentExpression(
-                                            SyntaxKind.SimpleAssignmentExpression,
-                                            MemberAccessExpression(
-                                                SyntaxKind.SimpleMemberAccessExpression,
-                                                ThisExpression(),
-                                                IdentifierName("PROPNAME3")),
-                                            IdentifierName("propalt3"))),
-                                    ExpressionStatement(
-                                        AssignmentExpression(
-                                            SyntaxKind.SimpleAssignmentExpression,
-                                            MemberAccessExpression(
-                                                SyntaxKind.SimpleMemberAccessExpression,
-                                                ThisExpression(),
-                                                IdentifierName("FIELDNAME1")),
-                                            IdentifierName("fieldalt1"))),
-                                    ExpressionStatement(
-                                        AssignmentExpression(
-                                            SyntaxKind.SimpleAssignmentExpression,
-                                            MemberAccessExpression(
-                                                SyntaxKind.SimpleMemberAccessExpression,
-                                                ThisExpression(),
-                                                IdentifierName("FIELDNAME2")),
-                                            IdentifierName("fieldalt2"))),
-                                    ExpressionStatement(
-                                        AssignmentExpression(
-                                            SyntaxKind.SimpleAssignmentExpression,
-                                            MemberAccessExpression(
-                                                SyntaxKind.SimpleMemberAccessExpression,
-                                                ThisExpression(),
-                                                IdentifierName("FIELDNAME3")),
-                                            IdentifierName("fieldalt3")))))
-                    }));
-    }
-}
-
-/*
-Examples:
-
-Property:
-[global::System.CodeDom.Compiler.GeneratedCode(tool:"GEN NAME",version:"GEN VERSION")]
-public TYPE NAME {get;}
-
-Attribute:
-// <auto-generated>
-#nullable enable
-namespace ConfigManager.Attributes
-{
-    [global::System.CodeDom.Compiler.GeneratedCodeAttribute(tool:"ConfigPropertyChangeGenerator", version:"1.0.0.0")]
-    [global::System.AttributeUsage(global::System.AttributeTargets.All, AllowMultiple = false, Inherited = false)]
-    internal sealed class TMPAttribute : global::System.Attribute
-    {
-        [global::System.CodeDom.Compiler.GeneratedCodeAttribute(tool:"ConfigPropertyChangeGenerator", version:"1.0.0.0")]
-        public string Prop1 { get; }
-        [global::System.CodeDom.Compiler.GeneratedCodeAttribute(tool:"ConfigPropertyChangeGenerator", version:"1.0.0.0")]
-        public string Prop2 { get; }
-        [global::System.CodeDom.Compiler.GeneratedCodeAttribute(tool:"ConfigPropertyChangeGenerator", version:"1.0.0.0")]
-        public int Prop3 { get; }
-        [global::System.CodeDom.Compiler.GeneratedCodeAttribute(tool:"ConfigPropertyChangeGenerator", version:"1.0.0.0")]
-        public TMPAttribute(string prop1, string prop2, int prop3) {
-            this.Prop1 = prop1;
-            this.Prop2 = prop2;
-            this.Prop3 = prop3;
-        }
-    }
-}
-
-
- */
