@@ -1,39 +1,11 @@
-﻿using ConfigManager.Generator;
-using ConfigManagerTest.TestHelper;
-using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.CSharp;
-
-namespace ConfigManagerTest.Tests;
-
-using VerifyCS = CSharpSourceGeneratorVerifier<ConfigPropertyChangeGenerator>;
-
-[UsesVerify]
-public class ConfigManagerGeneratorTests
-{
-    // TODO: add snapshot tests or direct tests
-
-    static GeneratorDriver GeneratorDriver()
-    {
-        CSharpCompilation compilation = CSharpCompilation.Create("name");
-        ConfigPropertyChangeGenerator generator = new();
-
-        GeneratorDriver driver = CSharpGeneratorDriver.Create(generator);
-
-        return driver.RunGenerators(compilation);
-    }
-
-    [Fact]
-    public Task TestDriver()
-    {
-        GeneratorDriver driver = GeneratorDriver();
-        return Verify(driver);
-    }
+﻿namespace ConfigManagerTest;
 
 #if DEBUG
+public class Debug
+{
     [Fact]
     public void DebugEntrypoint()
     {
-        
         // CodeSyntaxDefinitions.Field[] members =
         // {
         //     new("field1", "string", Modifier.Public), new("field2", "string", Modifier.Public),
@@ -52,5 +24,5 @@ public class ConfigManagerGeneratorTests
         //
         // Debug.WriteLine(classCode);
     }
-#endif
 }
+#endif

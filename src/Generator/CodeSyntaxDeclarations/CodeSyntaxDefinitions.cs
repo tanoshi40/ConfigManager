@@ -13,6 +13,19 @@ internal static class CodeSyntaxDefinitions
 
     internal class Property : Field
     {
+        private static class PropConstants
+        {
+            internal static readonly AccessorDeclarationSyntax Setter = AccessorDeclaration(
+                    SyntaxKind.SetAccessorDeclaration)
+                .WithSemicolonToken(
+                    Token(SyntaxKind.SemicolonToken));
+
+            internal static readonly AccessorDeclarationSyntax Getter = AccessorDeclaration(
+                    SyntaxKind.GetAccessorDeclaration)
+                .WithSemicolonToken(
+                    Token(SyntaxKind.SemicolonToken));
+        }
+
         internal bool HasGetter { get; }
         internal bool HasSetter { get; }
 
@@ -45,12 +58,12 @@ internal static class CodeSyntaxDefinitions
             SyntaxList<AccessorDeclarationSyntax> accessors = new();
             if (HasGetter)
             {
-                accessors = accessors.Add(SyntaxBuilder.PropConstants.Getter);
+                accessors = accessors.Add(PropConstants.Getter);
             }
 
             if (HasSetter)
             {
-                accessors = accessors.Add(SyntaxBuilder.PropConstants.Setter);
+                accessors = accessors.Add(PropConstants.Setter);
             }
 
             return PropertyDeclaration(

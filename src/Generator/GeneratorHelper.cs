@@ -2,6 +2,7 @@
 using System.Linq;
 using ConfigManager.Generator.CodeSyntaxDeclarations;
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using static Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
 
@@ -46,6 +47,29 @@ internal static class GeneratorHelper
     internal static string AsCodeContext(this CodeSyntaxDefinitions.MemberType members,
         AttributeSyntax codeGenAttribute, string @namespace) => AsCodeContext(codeGenAttribute, @namespace, members);
 
+    internal static AttributeSyntax BuildGeneratorAttribute(string generatorName, string generatorVersion) =>
+        Attribute(
+                QualifiedName(QualifiedName(QualifiedName(AliasQualifiedName(IdentifierName(
+                            Token(SyntaxKind.GlobalKeyword)),
+                        IdentifierName("System")), IdentifierName("CodeDom")), IdentifierName("Compiler")),
+                    IdentifierName("GeneratedCodeAttribute")))
+            .WithArgumentList(
+                AttributeArgumentList(
+                    SeparatedList<AttributeArgumentSyntax>(
+                        new SyntaxNodeOrToken[]
+                        {
+                            AttributeArgument(LiteralExpression(
+                                    SyntaxKind.StringLiteralExpression, Literal(generatorName)))
+                                .WithNameColon(NameColon(IdentifierName("tool"))),
+                            Token(SyntaxKind.CommaToken), AttributeArgument(
+                                    LiteralExpression(
+                                        SyntaxKind.StringLiteralExpression, Literal(generatorVersion)))
+                                .WithNameColon(NameColon(IdentifierName("version")))
+                        })));
+
+    internal static AttributeListSyntax Singelton(this AttributeSyntax attribute) => AttributeList(SingletonSeparatedList(attribute));
+    
+    
     // TODO: move to Malwis once it is accessible via nuget
     internal static T[] JoinArray<T>(this T[] input, T separator)
     {
