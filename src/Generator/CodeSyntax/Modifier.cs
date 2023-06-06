@@ -1,7 +1,7 @@
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 
-namespace ConfigManager.Generator.CodeSyntaxDeclarations;
+namespace ConfigManager.Generator.CodeSyntax;
 
 internal enum Modifier
 {

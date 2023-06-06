@@ -1,6 +1,6 @@
 ﻿using System;
 using System.Linq;
-using ConfigManager.Generator.CodeSyntaxDeclarations;
+using ConfigManager.Generator.CodeSyntax;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;

@@ -4,7 +4,7 @@ using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using static Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
 
-namespace ConfigManager.Generator.CodeSyntaxDeclarations;
+namespace ConfigManager.Generator.CodeSyntax;
 
 internal static class CodeSyntaxDefinitions
 {
