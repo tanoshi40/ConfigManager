@@ -16,8 +16,6 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Manager", "src\Manager\Mana
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Generator", "src\Generator\Generator.csproj", "{D1610999-379E-4153-B184-D8DFEEA7C979}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ConsoleTest", "test\ConsoleTest\ConsoleTest.csproj", "{9FB43684-D704-4E83-8CD4-BCF2F6823C7E}"
-EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -27,7 +25,6 @@ Global
 		{B3F78CD4-9C2F-49CD-B45B-0A47F72154CD} = {DE0EC81D-0B2C-4180-9FB0-99AB41FE34FE}
 		{3CC0E961-F72B-4C14-B763-0B5523535B35} = {102F4CE6-3678-4416-92D8-44160271DD75}
 		{D1610999-379E-4153-B184-D8DFEEA7C979} = {102F4CE6-3678-4416-92D8-44160271DD75}
-		{9FB43684-D704-4E83-8CD4-BCF2F6823C7E} = {DE0EC81D-0B2C-4180-9FB0-99AB41FE34FE}
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
 		{B3F78CD4-9C2F-49CD-B45B-0A47F72154CD}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
@@ -42,9 +39,5 @@ Global
 		{D1610999-379E-4153-B184-D8DFEEA7C979}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{D1610999-379E-4153-B184-D8DFEEA7C979}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{D1610999-379E-4153-B184-D8DFEEA7C979}.Release|Any CPU.Build.0 = Release|Any CPU
-		{9FB43684-D704-4E83-8CD4-BCF2F6823C7E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{9FB43684-D704-4E83-8CD4-BCF2F6823C7E}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{9FB43684-D704-4E83-8CD4-BCF2F6823C7E}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{9FB43684-D704-4E83-8CD4-BCF2F6823C7E}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal
