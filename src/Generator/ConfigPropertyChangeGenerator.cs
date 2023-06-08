@@ -1,6 +1,9 @@
 ﻿using System;
+using System.Linq;
+using System.Reflection;
 using System.Threading;
 using ConfigManager.Generator.CodeSyntax;
+using ConfigManager.Generator.PredicateUtils;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -24,8 +27,7 @@ internal sealed class ConfigPropertyChangeGenerator : IIncrementalGenerator
 
         ConstantAttributes = new CodeSyntaxDefinitions.Attribute[]
         {
-            new("Config", AttributeTargets.Class),
-            new("ConfigIgnore", AttributeTargets.Field)
+            new("Config", AttributeTargets.Class), new("ConfigIgnore", AttributeTargets.Field)
         };
     }
 
@@ -36,7 +38,7 @@ internal sealed class ConfigPropertyChangeGenerator : IIncrementalGenerator
 
         context.SyntaxProvider.CreateSyntaxProvider(SyntacticPredicate, SemanticTransform);
     }
-    
+
     private static bool SyntacticPredicate(SyntaxNode node, CancellationToken _) =>
         node is ClassDeclarationSyntax
         {
@@ -51,9 +53,42 @@ internal sealed class ConfigPropertyChangeGenerator : IIncrementalGenerator
         ClassDeclarationSyntax candidate = (context.Node as ClassDeclarationSyntax)!;
         ISymbol? symbol = context.SemanticModel.GetDeclaredSymbol(candidate, cancellationToken);
 
-        if (symbol is not INamedTypeSymbol type) return null;
-        
-        
+        if (symbol is not INamedTypeSymbol type)
+        {
+            return null;
+        }
+
+        const string configInterfaceName = "";
+        const string configAttributeName = "";
+
+        Compilation compilation = context.SemanticModel.Compilation;
+        // get config interface type
+        if (!SemanticTransformHelper.TryGetTypeByName(compilation, configInterfaceName,
+                out INamedTypeSymbol? configInterface))
+        {
+            return null;
+        }
+
+        // get config attribute type
+        if (!SemanticTransformHelper.TryGetTypeByName(compilation, configAttributeName,
+                out INamedTypeSymbol? configAttribute))
+        {
+            return null;
+        }
+
+        // type does not have config interface 
+        if (SemanticTransformHelper.HasInterface(configInterface, type))
+        {
+            return null;
+        }
+
+        // type does have config attribute 
+        if (!SemanticTransformHelper.TryGetAttributeTypeOfInfo(candidate, configAttribute, context.SemanticModel,
+                out INamedTypeSymbol? attribute))
+        {
+            return (type, attribute!);
+        }
+
         return null;
     }
 
