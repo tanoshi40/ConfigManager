@@ -1,4 +1,6 @@
 ﻿using System;
+using System.Collections.Generic;
+using System.Linq;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -9,7 +11,7 @@ namespace ConfigManager.Generator.CodeSyntax;
 internal static class CodeSyntaxDefinitions
 {
     private static readonly SyntaxToken CommaToken = Token(SyntaxKind.CommaToken);
-
+    private const string FullGlobalPrefix = "global::System";
 
     internal class Property : Field
     {
@@ -79,10 +81,10 @@ internal static class CodeSyntaxDefinitions
     {
         internal string AlternativeName { get; }
 
-        public Field(string name, string fullyQualifiedType, Modifier accessModifier, string? alternativeName,
-            Modifier[]? otherModifiers, SyntaxList<AttributeListSyntax>? attributes) :
-            base(name, fullyQualifiedType,
-                accessModifier, otherModifiers, attributes) =>
+        internal Field(string name, string fullyQualifiedType, Modifier? accessModifier = null,
+            string? alternativeName = null, Modifier[]? otherModifiers = null,
+            SyntaxList<AttributeListSyntax>? attributes = null) :
+            base(name, fullyQualifiedType, accessModifier, otherModifiers, attributes) =>
             AlternativeName = alternativeName ?? Name.ToLower();
 
         public Parameter AsParameter() => Parameter.CreateInstance(this);
@@ -107,7 +109,7 @@ internal static class CodeSyntaxDefinitions
 
     internal class Constructor : Method
     {
-        internal Constructor(string name, Modifier accessModifier, BlockSyntax? body = null,
+        internal Constructor(string name, Modifier? accessModifier = null, BlockSyntax? body = null,
             SyntaxList<AttributeListSyntax>? attributes = null) :
             base(name, name, accessModifier, null, null, attributes, body)
         {
@@ -124,9 +126,10 @@ internal static class CodeSyntaxDefinitions
         internal Parameter[] Parameters { get; }
         internal BlockSyntax Body { get; }
 
-        public Method(string name, string fullyQualifiedReturnType, Modifier accessModifier, Modifier[]? otherModifiers,
-            Parameter[]? parameters, SyntaxList<AttributeListSyntax>? attributes, BlockSyntax? body) : base(name,
-            fullyQualifiedReturnType, accessModifier, otherModifiers, attributes)
+        public Method(string name, string fullyQualifiedReturnType, Modifier? accessModifier = null,
+            Modifier[]? otherModifiers = null, Parameter[]? parameters = null,
+            SyntaxList<AttributeListSyntax>? attributes = null, BlockSyntax? body = null) :
+            base(name, fullyQualifiedReturnType, accessModifier, otherModifiers, attributes)
         {
             Parameters = parameters ?? Array.Empty<Parameter>();
             Body = body ?? Block();
@@ -144,10 +147,12 @@ internal static class CodeSyntaxDefinitions
             return ParameterList(SeparatedList<ParameterSyntax>(parameters.JoinArray(CommaToken)));
         }
 
-        protected override MemberDeclarationSyntax MemberSyntax(AttributeSyntax codeGenAttribute) =>
+        internal MethodDeclarationSyntax GetMethodDeclaration() =>
             MethodDeclaration(IdentifierName(FullyQualifiedType), Identifier(Name))
-                .WithParameterList(AsParameterList())
-                .WithBody(Body);
+                .WithParameterList(AsParameterList());
+
+        protected override MemberDeclarationSyntax MemberSyntax(AttributeSyntax codeGenAttribute) =>
+            GetMethodDeclaration().WithBody(Body);
     }
 
     internal class Parameter
@@ -168,10 +173,42 @@ internal static class CodeSyntaxDefinitions
                 .WithType(IdentifierName(FullyQualifiedType));
     }
 
+    internal class Interface : Type
+    {
+        internal Interface(string name, Modifier? accessModifier = null, IEnumerable<Property>? properties = null,
+            Method[]? methods = null, SyntaxList<AttributeListSyntax>? attributes = null) :
+            base(name, accessModifier,
+                methods: methods,
+                members: properties?.Select(prop => (Field)prop).ToArray(),
+                attributes: attributes)
+        {
+        }
+
+        protected override MemberDeclarationSyntax MemberSyntax(AttributeSyntax codeGenAttribute)
+        {
+            MemberDeclarationSyntax[] content = new MemberDeclarationSyntax[Members.Length + Methods.Length];
+
+            int contentIndex = 0;
+            for (int i = 0; i < Members.Length; i++, contentIndex++)
+            {
+                content[i] = Members[i].AsMember(codeGenAttribute);
+            }
+
+            for (int i = 0; i < Methods.Length; i++, contentIndex++)
+            {
+                Method method = Methods[i];
+                content[contentIndex] =
+                    method.WithMetadata(
+                        method.GetMethodDeclaration().WithSemicolonToken(Token(SyntaxKind.SemicolonToken)),
+                        codeGenAttribute);
+            }
+
+            return WithBaseTypes(InterfaceDeclaration(Name)).WithMembers(List(content));
+        }
+    }
+
     internal class Attribute : Clazz
     {
-        private const string FullGlobalPrefix = "global::System";
-
         private const string FullAttribute = $"{FullGlobalPrefix}.{nameof(Attribute)}";
         private const string FullAttributeUsage = $"{FullGlobalPrefix}.{nameof(AttributeUsageAttribute)}";
         private const string FullAttributeTargets = $"{FullGlobalPrefix}.{nameof(AttributeTargets)}";
@@ -179,7 +216,7 @@ internal static class CodeSyntaxDefinitions
         internal Attribute(string name,
             AttributeTargets targets,
             bool allowMultiple = false,
-            Modifier accessModifier = Modifier.Public, Field[]? members = null, Method[]? methods = null,
+            Modifier? accessModifier = null, Field[]? members = null, Method[]? methods = null,
             SyntaxList<AttributeListSyntax>? attributes = null) :
             base(
                 $"{name}Attribute",
@@ -242,21 +279,15 @@ internal static class CodeSyntaxDefinitions
         }
     }
 
-    internal class Clazz : MemberType
+    internal class Clazz : Type
     {
-        public Clazz(string name, Modifier accessModifier,
-            Modifier[]? otherModifiers, Field[]? members,
-            Method[]? methods, BaseType[]? baseTypes,
-            SyntaxList<AttributeListSyntax>? attributes) : base(name, name, accessModifier, otherModifiers, attributes)
+        internal Clazz(string name, Modifier? accessModifier = null,
+            Modifier[]? otherModifiers = null, Field[]? members = null,
+            Method[]? methods = null, BaseType[]? baseTypes = null,
+            SyntaxList<AttributeListSyntax>? attributes = null) :
+            base(name, accessModifier, otherModifiers, attributes, members, baseTypes, methods)
         {
-            Members = members ?? Array.Empty<Field>();
-            BaseTypes = baseTypes ?? Array.Empty<BaseType>();
-            Methods = methods ?? Array.Empty<Method>();
         }
-
-        internal Field[] Members { get; }
-        internal BaseType[] BaseTypes { get; }
-        internal Method[] Methods { get; }
 
         protected Constructor GetInitConstructor()
         {
@@ -281,45 +312,62 @@ internal static class CodeSyntaxDefinitions
 
         protected override MemberDeclarationSyntax MemberSyntax(AttributeSyntax codeGenAttribute)
         {
-            // ClassBuilder
-            ClassDeclarationSyntax builder = ClassDeclaration(Name)
-                // Modifiers (private/public static abstract etc)
-                .WithModifiers(AsModifierList());
+            MemberDeclarationSyntax[] content = new MemberDeclarationSyntax[Members.Length + Methods.Length + 1];
 
-            // BaseClasses
-            if (BaseTypes.Length > 0)
+            int contentIndex = 0;
+            for (int i = 0; i < Members.Length; i++, contentIndex++)
             {
-                SyntaxNodeOrToken[] baseTypes = new SyntaxNodeOrToken[BaseTypes.Length];
-                for (int i = 0; i < BaseTypes.Length; i++)
-                {
-                    baseTypes[i] = BaseTypes[i].GetSyntax();
-                }
-
-                builder = builder.WithBaseList(
-                    BaseList(
-                        SeparatedList<BaseTypeSyntax>(
-                            baseTypes.JoinArray(CommaToken)
-                        )));
+                content[contentIndex] = Members[i].AsMember(codeGenAttribute);
             }
 
-            MemberDeclarationSyntax[] classContent = new MemberDeclarationSyntax[Members.Length + Methods.Length + 1];
+            content[contentIndex] = GetInitConstructor().AsMember(codeGenAttribute);
 
-            for (int i = 0; i < Members.Length; i++)
+            for (int i = 0; i < Methods.Length; i++, contentIndex++)
             {
-                classContent[i] = Members[i].AsMember(codeGenAttribute);
+                content[contentIndex] = Methods[i].AsMember(codeGenAttribute);
             }
 
-            classContent[Members.Length == 0 ? 0 : Members.Length - 1] =
-                GetInitConstructor().AsMember(codeGenAttribute);
+            return WithBaseTypes(ClassDeclaration(Name))
+                .WithMembers(List(content));
+        }
+    }
 
-            for (int classIndex = Members.Length, methodIndex = 0;
-                 methodIndex < Methods.Length;
-                 methodIndex++, classIndex++)
+    internal abstract class Type : MemberType
+    {
+        internal Field[] Members { get; }
+        internal BaseType[] BaseTypes { get; }
+        internal Method[] Methods { get; }
+
+        protected Type(string name, Modifier? accessModifier = null,
+            Modifier[]? otherModifiers = null, SyntaxList<AttributeListSyntax>? attributes = null,
+            Field[]? members = null, BaseType[]? baseTypes = null, Method[]? methods = null) :
+            base(name, name, accessModifier, otherModifiers, attributes)
+        {
+            Members = members ?? Array.Empty<Field>();
+            BaseTypes = baseTypes ?? Array.Empty<BaseType>();
+            Methods = methods ?? Array.Empty<Method>();
+        }
+
+        protected TypeDeclarationSyntax WithBaseTypes(TypeDeclarationSyntax syntax)
+        {
+            if (BaseTypes.Length <= 0)
             {
-                classContent[classIndex] = Methods[methodIndex].AsMember(codeGenAttribute);
+                return syntax;
             }
 
-            return builder.WithMembers(List(classContent));
+            SyntaxNodeOrToken[] baseTypes = new SyntaxNodeOrToken[BaseTypes.Length];
+            for (int i = 0; i < BaseTypes.Length; i++)
+            {
+                baseTypes[i] = BaseTypes[i].GetSyntax();
+            }
+
+            syntax = syntax.WithBaseList(
+                BaseList(
+                    SeparatedList<BaseTypeSyntax>(
+                        baseTypes.JoinArray(CommaToken)
+                    )));
+
+            return syntax;
         }
     }
 
@@ -332,9 +380,9 @@ internal static class CodeSyntaxDefinitions
         private SyntaxList<AttributeListSyntax> Attributes { get; }
 
 
-        protected MemberType(string name, string fullyQualifiedType, Modifier accessModifier,
-            Modifier[]? otherModifiers,
-            SyntaxList<AttributeListSyntax>? attributes) :
+        protected MemberType(string name, string fullyQualifiedType, Modifier? accessModifier = null,
+            Modifier[]? otherModifiers = null,
+            SyntaxList<AttributeListSyntax>? attributes = null) :
             base(accessModifier, otherModifiers)
         {
             Name = name;
@@ -342,9 +390,19 @@ internal static class CodeSyntaxDefinitions
             Attributes = attributes ?? new();
         }
 
-        public MemberDeclarationSyntax AsMember(AttributeSyntax codeGenAttribute) => MemberSyntax(codeGenAttribute)
-            .WithModifiers(AsModifierList())
-            .WithAttributeLists(Attributes.Add(codeGenAttribute.Singelton()));
+        protected MemberDeclarationSyntax WithModifiers(MemberDeclarationSyntax syntax)
+            => syntax.WithModifiers(AsModifierList());
+
+        protected MemberDeclarationSyntax WithAttributes(MemberDeclarationSyntax syntax,
+            AttributeSyntax codeGenAttribute)
+            => syntax.WithAttributeLists(Attributes.Add(codeGenAttribute.Singelton()));
+
+        internal MemberDeclarationSyntax WithMetadata(MemberDeclarationSyntax syntax,
+            AttributeSyntax codeGenAttribute) =>
+            WithAttributes(WithModifiers(syntax), codeGenAttribute);
+
+        internal MemberDeclarationSyntax AsMember(AttributeSyntax codeGenAttribute) =>
+            WithMetadata(MemberSyntax(codeGenAttribute), codeGenAttribute);
 
         protected abstract MemberDeclarationSyntax MemberSyntax(AttributeSyntax codeGenAttribute);
     }
@@ -354,9 +412,9 @@ internal static class CodeSyntaxDefinitions
         internal Modifier AccessModifier { get; }
         internal Modifier[] OtherModifiers { get; }
 
-        protected MultiModifierType(Modifier accessModifier, Modifier[]? otherModifiers)
+        protected MultiModifierType(Modifier? accessModifier = null, Modifier[]? otherModifiers = null)
         {
-            AccessModifier = accessModifier;
+            AccessModifier = accessModifier ?? Modifier.Public;
             OtherModifiers = otherModifiers ?? Array.Empty<Modifier>();
         }
 

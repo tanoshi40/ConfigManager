@@ -35,13 +35,4 @@
     <ProjectReference Include="..\..\src\Generator\Generator.csproj" />
   </ItemGroup>
 
-  <ItemGroup>
-    <None Update="Tests\Generator\ConfigManagerGeneratorTests.TestDriver#Generated_ConfigIgnoreAttribute.verified.cs">
-      <ParentFile>ConfigManagerGeneratorTests</ParentFile>
-    </None>
-    <None Update="Tests\Generator\ConfigManagerGeneratorTests.TestDriver#Generated_ConfigAttribute.verified.cs">
-      <ParentFile>ConfigManagerGeneratorTests</ParentFile>
-    </None>
-  </ItemGroup>
-
 </Project>

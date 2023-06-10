@@ -1,6 +1,4 @@
 ﻿using System;
-using System.Linq;
-using System.Reflection;
 using System.Threading;
 using ConfigManager.Generator.CodeSyntax;
 using ConfigManager.Generator.PredicateUtils;
@@ -15,20 +13,34 @@ internal sealed class ConfigPropertyChangeGenerator : IIncrementalGenerator
 {
     internal const string GenName = nameof(ConfigPropertyChangeGenerator);
     internal const string AttributeNamespace = "ConfigManager.Attributes";
+    internal const string InterfacesNamespace = "ConfigManager.Interfaces";
 
     internal static readonly string Version;
     internal static readonly AttributeSyntax CodeGenAttribute;
-    internal static readonly CodeSyntaxDefinitions.Attribute[] ConstantAttributes;
+    internal static readonly CodeSyntaxDefinitions.Type[] UnconditionalClassesToAdd;
+
+    internal static readonly CodeSyntaxDefinitions.Attribute ConfigAttribute;
+    internal static readonly CodeSyntaxDefinitions.Attribute ConfigIgnoreAttribute;
+
+    internal static readonly CodeSyntaxDefinitions.Interface ConfigInterface;
 
     static ConfigPropertyChangeGenerator()
     {
         Version = typeof(ConfigPropertyChangeGenerator).GetAssemblyVersion();
         CodeGenAttribute = GeneratorHelper.BuildGeneratorAttribute(GenName, Version);
 
-        ConstantAttributes = new CodeSyntaxDefinitions.Attribute[]
-        {
-            new("Config", AttributeTargets.Class), new("ConfigIgnore", AttributeTargets.Field)
-        };
+        ConfigAttribute = new("Config", AttributeTargets.Class);
+        ConfigIgnoreAttribute = new("ConfigIgnore", AttributeTargets.Field);
+
+        ConfigInterface = new(
+            "IConfig",
+            methods: new CodeSyntaxDefinitions.Method[]
+            {
+                new("Save", "void"), new("Load", "IConfig", otherModifiers: new[] {Modifier.Static})
+            });
+
+        UnconditionalClassesToAdd =
+            new CodeSyntaxDefinitions.Type[] {ConfigAttribute, ConfigIgnoreAttribute, ConfigInterface};
     }
 
 
@@ -58,8 +70,8 @@ internal sealed class ConfigPropertyChangeGenerator : IIncrementalGenerator
             return null;
         }
 
-        const string configInterfaceName = "";
-        const string configAttributeName = "";
+        string configInterfaceName = $"{AttributeNamespace}.{ConfigInterface.Name}";
+        string configAttributeName = $"{InterfacesNamespace}.{ConfigAttribute.Name}";
 
         Compilation compilation = context.SemanticModel.Compilation;
         // get config interface type
@@ -95,9 +107,9 @@ internal sealed class ConfigPropertyChangeGenerator : IIncrementalGenerator
 
     private static void AddStaticSources(IncrementalGeneratorPostInitializationContext context)
     {
-        foreach (CodeSyntaxDefinitions.Attribute attribute in ConstantAttributes)
+        foreach (CodeSyntaxDefinitions.Type type in UnconditionalClassesToAdd)
         {
-            context.AddSource(attribute.FileName, attribute.AsCodeContext(CodeGenAttribute, AttributeNamespace));
+            context.AddSource(type.FileName, type.AsCodeContext(CodeGenAttribute, AttributeNamespace));
         }
     }
 }
