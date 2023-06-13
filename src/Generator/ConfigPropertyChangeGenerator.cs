@@ -12,12 +12,13 @@ namespace ConfigManager.Generator;
 [Generator(LanguageNames.CSharp)]
 internal sealed class ConfigPropertyChangeGenerator : IIncrementalGenerator, IGenerator
 {
+    internal static readonly string GenVersion;
     internal const string GenName = nameof(ConfigPropertyChangeGenerator);
+    
     private const string BaseNamespace = "ConfigManager";
     private const string AttributeNamespace = $"{BaseNamespace}.Attributes";
     private const string InterfacesNamespace = $"{BaseNamespace}.Interfaces";
 
-    internal static readonly string GenVersion;
     private static readonly AttributeSyntax CodeGenAttribute;
     private static readonly CodeSyntaxDefinitions.Type[] UnconditionalClassesToAdd;
 
@@ -115,17 +116,22 @@ internal sealed class ConfigPropertyChangeGenerator : IIncrementalGenerator, IGe
         }
     }
 
-    private static CodeSyntaxDefinitions.Interface CreateConfigInterface() =>
-        new(
+    private static CodeSyntaxDefinitions.Interface CreateConfigInterface()
+    {
+        CodeSyntaxDefinitions.Method saveMethod = new("Save", "void");
+        CodeSyntaxDefinitions.Method loadMethod = new("Load", "IConfig", otherModifiers: new[] {Modifier.Static},
+            body: Block(SingletonList<StatementSyntax>(
+                ThrowStatement(
+                    ObjectCreationExpression(
+                            IdentifierName("NotImplementedException"))
+                        .WithArgumentList(ArgumentList()))))
+        );
+        
+        return new(
             "IConfig",
-            methods: new CodeSyntaxDefinitions.Method[]
+            methods: new[]
             {
-                new("Save", "void"), new("Load", "IConfig", otherModifiers: new[] {Modifier.Static},
-                    body: Block(SingletonList<StatementSyntax>(
-                        ThrowStatement(
-                            ObjectCreationExpression(
-                                    IdentifierName("NotImplementedException"))
-                                .WithArgumentList(ArgumentList()))))
-                )
+                saveMethod, loadMethod
             });
+    }
 }
