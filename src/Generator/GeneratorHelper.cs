@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Diagnostics;
 using System.Linq;
 using ConfigManager.Generator.CodeSyntax;
 using Microsoft.CodeAnalysis;
@@ -67,9 +68,10 @@ internal static class GeneratorHelper
                                 .WithNameColon(NameColon(IdentifierName("version")))
                         })));
 
-    internal static AttributeListSyntax Singelton(this AttributeSyntax attribute) => AttributeList(SingletonSeparatedList(attribute));
-    
-    
+    internal static AttributeListSyntax Singelton(this AttributeSyntax attribute) =>
+        AttributeList(SingletonSeparatedList(attribute));
+
+
     // TODO: move to Malwis once it is accessible via nuget
     internal static T[] JoinArray<T>(this T[] input, T separator)
     {
@@ -92,4 +94,40 @@ internal static class GeneratorHelper
     // TODO: move to Malwis once it is accessible via nuget
     internal static T[] SplitFlagEnum<T>(this T flaggedEnum) where T : Enum, IConvertible =>
         Enum.GetValues(typeof(T)).Cast<T>().Where(e => flaggedEnum.HasFlag(e)).ToArray();
+
+
+    internal static void DebugLine(this IGenerator gen, object? msg)
+    {
+#if DEBUG
+        DebugLine(gen, msg?.ToString());
+#endif
+    }
+
+    internal static void DebugLine(this IGenerator gen, object? msg, object[] args)
+    {
+#if DEBUG
+        DebugLine(gen, msg?.ToString(), args);
+#endif
+    }
+
+    internal static void DebugLine(this IGenerator gen, string? msg)
+    {
+#if DEBUG
+        DebugLine(gen, msg, Array.Empty<object>());
+#endif
+    }
+
+    internal static void DebugLine(this IGenerator gen, string? format, params object[] args)
+    {
+#if DEBUG
+        string message = format is null
+            ? "null"
+            : args.Length == 0
+                ? format
+                : string.Format(format, args);
+
+        string prefix = $"[{gen.Name}:{gen.Version}]";
+        Debug.WriteLine($"{prefix} {message}");
+#endif
+    }
 }

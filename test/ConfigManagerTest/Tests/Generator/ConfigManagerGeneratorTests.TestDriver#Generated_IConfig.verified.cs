@@ -9,6 +9,9 @@ namespace ConfigManager.Attributes
         [global::System.CodeDom.Compiler.GeneratedCodeAttribute(tool: "ConfigPropertyChangeGenerator", version: "1.0.0.0")]
         public void Save();
         [global::System.CodeDom.Compiler.GeneratedCodeAttribute(tool: "ConfigPropertyChangeGenerator", version: "1.0.0.0")]
-        public static IConfig Load();
+        public static IConfig Load()
+        {
+            throw new NotImplementedException();
+        }
     }
 }

@@ -123,8 +123,12 @@ internal static class CodeSyntaxDefinitions
 
     internal class Method : MemberType
     {
+        private readonly BlockSyntax? _body;
         internal Parameter[] Parameters { get; }
-        internal BlockSyntax Body { get; }
+
+        public bool Abstract { get; set; } = false;
+
+        internal BlockSyntax Body => _body ?? Block();
 
         public Method(string name, string fullyQualifiedReturnType, Modifier? accessModifier = null,
             Modifier[]? otherModifiers = null, Parameter[]? parameters = null,
@@ -132,7 +136,7 @@ internal static class CodeSyntaxDefinitions
             base(name, fullyQualifiedReturnType, accessModifier, otherModifiers, attributes)
         {
             Parameters = parameters ?? Array.Empty<Parameter>();
-            Body = body ?? Block();
+            _body = body;
         }
 
         protected ParameterListSyntax AsParameterList()
@@ -147,12 +151,15 @@ internal static class CodeSyntaxDefinitions
             return ParameterList(SeparatedList<ParameterSyntax>(parameters.JoinArray(CommaToken)));
         }
 
-        internal MethodDeclarationSyntax GetMethodDeclaration() =>
-            MethodDeclaration(IdentifierName(FullyQualifiedType), Identifier(Name))
+        protected override MemberDeclarationSyntax MemberSyntax(AttributeSyntax codeGenAttribute)
+        {
+            MethodDeclarationSyntax builder = MethodDeclaration(IdentifierName(FullyQualifiedType), Identifier(Name))
                 .WithParameterList(AsParameterList());
 
-        protected override MemberDeclarationSyntax MemberSyntax(AttributeSyntax codeGenAttribute) =>
-            GetMethodDeclaration().WithBody(Body);
+            return (Abstract || OtherModifiers.Contains(Modifier.Abstract)) && _body == null
+                ? builder.WithSemicolonToken(Token(SyntaxKind.SemicolonToken))
+                : builder.WithBody(Body);
+        }
     }
 
     internal class Parameter
@@ -178,7 +185,11 @@ internal static class CodeSyntaxDefinitions
         internal Interface(string name, Modifier? accessModifier = null, IEnumerable<Property>? properties = null,
             Method[]? methods = null, SyntaxList<AttributeListSyntax>? attributes = null) :
             base(name, accessModifier,
-                methods: methods,
+                methods: methods?.Select(method =>
+                {
+                    method.Abstract = true;
+                    return method;
+                }).ToArray(),
                 members: properties?.Select(prop => (Field)prop).ToArray(),
                 attributes: attributes)
         {
@@ -197,10 +208,7 @@ internal static class CodeSyntaxDefinitions
             for (int i = 0; i < Methods.Length; i++, contentIndex++)
             {
                 Method method = Methods[i];
-                content[contentIndex] =
-                    method.WithMetadata(
-                        method.GetMethodDeclaration().WithSemicolonToken(Token(SyntaxKind.SemicolonToken)),
-                        codeGenAttribute);
+                content[contentIndex] = method.AsMember(codeGenAttribute);
             }
 
             return WithBaseTypes(InterfaceDeclaration(Name)).WithMembers(List(content));

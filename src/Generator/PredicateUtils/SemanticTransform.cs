@@ -1,14 +1,28 @@
-﻿using System.Linq;
-using Microsoft.CodeAnalysis;
+﻿using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace ConfigManager.Generator.PredicateUtils;
 
 internal static class SemanticTransformHelper
 {
-    internal static bool HasInterface(INamedTypeSymbol? type, INamedTypeSymbol targetInterface) =>
-        type is not null && type.AllInterfaces.Any(@interface =>
-            @interface.OriginalDefinition.Equals(targetInterface, SymbolEqualityComparer.Default));
+    internal static bool HasInterface(INamedTypeSymbol? type, INamedTypeSymbol targetInterface)
+    {
+        if (type is null)
+        {
+            return false;
+        }
+
+        foreach (INamedTypeSymbol @interface in type.AllInterfaces)
+        {
+            if (@interface.OriginalDefinition.Equals(targetInterface, SymbolEqualityComparer.Default))
+            {
+                return true;
+            }
+        }
+
+        return false;
+
+    }
 
     internal static bool TryGetTypeByName(Compilation compilation, string typeName, out INamedTypeSymbol? type)
     {

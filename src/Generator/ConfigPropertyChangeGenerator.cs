@@ -5,44 +5,44 @@ using ConfigManager.Generator.PredicateUtils;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using static Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
 
 namespace ConfigManager.Generator;
 
 [Generator(LanguageNames.CSharp)]
-internal sealed class ConfigPropertyChangeGenerator : IIncrementalGenerator
+internal sealed class ConfigPropertyChangeGenerator : IIncrementalGenerator, IGenerator
 {
     internal const string GenName = nameof(ConfigPropertyChangeGenerator);
-    internal const string AttributeNamespace = "ConfigManager.Attributes";
-    internal const string InterfacesNamespace = "ConfigManager.Interfaces";
+    private const string BaseNamespace = "ConfigManager";
+    private const string AttributeNamespace = $"{BaseNamespace}.Attributes";
+    private const string InterfacesNamespace = $"{BaseNamespace}.Interfaces";
 
-    internal static readonly string Version;
-    internal static readonly AttributeSyntax CodeGenAttribute;
-    internal static readonly CodeSyntaxDefinitions.Type[] UnconditionalClassesToAdd;
+    internal static readonly string GenVersion;
+    private static readonly AttributeSyntax CodeGenAttribute;
+    private static readonly CodeSyntaxDefinitions.Type[] UnconditionalClassesToAdd;
 
-    internal static readonly CodeSyntaxDefinitions.Attribute ConfigAttribute;
-    internal static readonly CodeSyntaxDefinitions.Attribute ConfigIgnoreAttribute;
+    private static readonly CodeSyntaxDefinitions.Attribute ConfigAttribute;
+    private static readonly CodeSyntaxDefinitions.Attribute ConfigIgnoreAttribute;
 
-    internal static readonly CodeSyntaxDefinitions.Interface ConfigInterface;
+    private static readonly CodeSyntaxDefinitions.Interface ConfigInterface;
 
+    public string Name => GenName;
+    public string Version => GenVersion;
+    
     static ConfigPropertyChangeGenerator()
     {
-        Version = typeof(ConfigPropertyChangeGenerator).GetAssemblyVersion();
-        CodeGenAttribute = GeneratorHelper.BuildGeneratorAttribute(GenName, Version);
+        GenVersion = typeof(ConfigPropertyChangeGenerator).GetAssemblyVersion();
+        CodeGenAttribute = GeneratorHelper.BuildGeneratorAttribute(GenName, GenVersion);
 
         ConfigAttribute = new("Config", AttributeTargets.Class);
         ConfigIgnoreAttribute = new("ConfigIgnore", AttributeTargets.Field);
 
-        ConfigInterface = new(
-            "IConfig",
-            methods: new CodeSyntaxDefinitions.Method[]
-            {
-                new("Save", "void"), new("Load", "IConfig", otherModifiers: new[] {Modifier.Static})
-            });
+        ConfigInterface = CreateConfigInterface();
 
         UnconditionalClassesToAdd =
             new CodeSyntaxDefinitions.Type[] {ConfigAttribute, ConfigIgnoreAttribute, ConfigInterface};
     }
-
+    
 
     public void Initialize(IncrementalGeneratorInitializationContext context)
     {
@@ -70,8 +70,8 @@ internal sealed class ConfigPropertyChangeGenerator : IIncrementalGenerator
             return null;
         }
 
-        string configInterfaceName = $"{AttributeNamespace}.{ConfigInterface.Name}";
-        string configAttributeName = $"{InterfacesNamespace}.{ConfigAttribute.Name}";
+        string configInterfaceName = $"{InterfacesNamespace}.{ConfigInterface.Name}";
+        string configAttributeName = $"{AttributeNamespace}.{ConfigAttribute.Name}";
 
         Compilation compilation = context.SemanticModel.Compilation;
         // get config interface type
@@ -105,11 +105,27 @@ internal sealed class ConfigPropertyChangeGenerator : IIncrementalGenerator
     }
 
 
-    private static void AddStaticSources(IncrementalGeneratorPostInitializationContext context)
+    private void AddStaticSources(IncrementalGeneratorPostInitializationContext context)
     {
+        this.DebugLine("adding static sources");
         foreach (CodeSyntaxDefinitions.Type type in UnconditionalClassesToAdd)
         {
+            this.DebugLine("adding {}", type.FileName);
             context.AddSource(type.FileName, type.AsCodeContext(CodeGenAttribute, AttributeNamespace));
         }
     }
+
+    private static CodeSyntaxDefinitions.Interface CreateConfigInterface() =>
+        new(
+            "IConfig",
+            methods: new CodeSyntaxDefinitions.Method[]
+            {
+                new("Save", "void"), new("Load", "IConfig", otherModifiers: new[] {Modifier.Static},
+                    body: Block(SingletonList<StatementSyntax>(
+                        ThrowStatement(
+                            ObjectCreationExpression(
+                                    IdentifierName("NotImplementedException"))
+                                .WithArgumentList(ArgumentList()))))
+                )
+            });
 }
