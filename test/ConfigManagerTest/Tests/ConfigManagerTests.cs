@@ -1,4 +1,4 @@
-using ConfigManager.Generator;
+using ConfigManager.Generator.Helper;
 
 namespace ConfigManagerTest.Tests;
 

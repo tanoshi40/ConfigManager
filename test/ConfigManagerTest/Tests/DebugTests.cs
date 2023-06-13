@@ -1,7 +1,7 @@
 ﻿namespace ConfigManagerTest;
 
 #if DEBUG
-public class Debug
+public class DebugTests
 {
     [Fact]
     public void DebugEntrypoint()

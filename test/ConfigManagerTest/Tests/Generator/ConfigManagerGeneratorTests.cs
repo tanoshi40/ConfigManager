@@ -1,27 +1,26 @@
-﻿using ConfigManager.Generator;
+﻿using ConfigManagerTest.Helper;
 using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.CSharp;
+using static ConfigManagerTest.Helper.TestHelper;
 
 namespace ConfigManagerTest.Tests.Generator;
-
 
 [UsesVerify]
 public class ConfigManagerGeneratorTests
 {
-    static GeneratorDriver GeneratorDriver()
+
+
+    [Theory]
+    [EmbeddedResourceData("ConfigClass._cs")]
+    public Task TestSimpleConfig(string data)
     {
-        CSharpCompilation compilation = CSharpCompilation.Create(nameof(ConfigPropertyChangeGenerator));
-        ConfigPropertyChangeGenerator generator = new();
-
-        GeneratorDriver driver = CSharpGeneratorDriver.Create(generator);
-
-        return driver.RunGenerators(compilation);
+        GeneratorDriver driver = GenerateDriver(data);
+        return Verify(driver);
     }
 
     [Fact]
     public Task TestDriver()
     {
-        GeneratorDriver driver = GeneratorDriver();
+        GeneratorDriver driver = GenerateDriver();
         return Verify(driver);
     }
 }

@@ -35,4 +35,11 @@
     <ProjectReference Include="..\..\src\Generator\Generator.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Remove="Resources\ConfigClass.fakecs" />
+    <None Include="Resources\ConfigClass._cs">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
 </Project>

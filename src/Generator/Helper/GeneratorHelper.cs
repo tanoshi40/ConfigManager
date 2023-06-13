@@ -1,15 +1,13 @@
 ﻿using System;
-using System.Diagnostics;
-using System.Linq;
 using ConfigManager.Generator.CodeSyntax;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using static Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
 
-namespace ConfigManager.Generator;
+namespace ConfigManager.Generator.Helper;
 
-internal static class GeneratorHelper
+internal static partial class GeneratorHelper
 {
     internal static string GetHelperAssemblyVersion() => typeof(GeneratorHelper).GetAssemblyVersion();
 
@@ -70,64 +68,4 @@ internal static class GeneratorHelper
 
     internal static AttributeListSyntax Singelton(this AttributeSyntax attribute) =>
         AttributeList(SingletonSeparatedList(attribute));
-
-
-    // TODO: move to Malwis once it is accessible via nuget
-    internal static T[] JoinArray<T>(this T[] input, T separator)
-    {
-        if (input.Length < 2) { return input; }
-
-        T[] joined = new T[input.Length + input.Length - 1];
-
-        for (int srcI = 0, targetI = 0; srcI < input.Length; srcI++, targetI += 2)
-        {
-            joined[targetI] = input[srcI];
-            if (targetI + 1 < joined.Length)
-            {
-                joined[targetI + 1] = separator;
-            }
-        }
-
-        return joined;
-    }
-
-    // TODO: move to Malwis once it is accessible via nuget
-    internal static T[] SplitFlagEnum<T>(this T flaggedEnum) where T : Enum, IConvertible =>
-        Enum.GetValues(typeof(T)).Cast<T>().Where(e => flaggedEnum.HasFlag(e)).ToArray();
-
-
-    internal static void DebugLine(this IGenerator gen, object? msg)
-    {
-#if DEBUG
-        DebugLine(gen, msg?.ToString());
-#endif
-    }
-
-    internal static void DebugLine(this IGenerator gen, object? msg, object[] args)
-    {
-#if DEBUG
-        DebugLine(gen, msg?.ToString(), args);
-#endif
-    }
-
-    internal static void DebugLine(this IGenerator gen, string? msg)
-    {
-#if DEBUG
-        DebugLine(gen, msg, Array.Empty<object>());
-#endif
-    }
-
-    internal static void DebugLine(this IGenerator gen, string? format, params object[] args)
-    {
-#if DEBUG
-        string message = format is null
-            ? "null"
-            : args.Length == 0
-                ? format
-                : string.Format(format, args);
-
-        string prefix = $"[{gen.Name}:{gen.Version}]";
-        Debug.WriteLine($"{prefix} {message}");
-#endif
-    }
 }
